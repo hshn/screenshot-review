@@ -1,0 +1,101 @@
+name: Screenshot diff report
+description: |
+  Collect the screenshots that need review, push them to a side branch, and write them
+  into the job summary as one table per screenshot.
+
+inputs:
+  pr-number:
+    description: Pull request number. Namespaces the side branch and the summary.
+    required: true
+  github-token:
+    description: Token used to push the screenshots to the side branch. Needs contents write.
+    required: true
+  committer-name:
+    description: Name recorded as the committer on the side branch.
+    required: false
+    default: github-actions[bot]
+  committer-email:
+    description: Email recorded as the committer on the side branch.
+    required: false
+    default: 41898282+github-actions[bot]@users.noreply.github.com
+  test-results-dir:
+    description: Directory Playwright writes its artifacts to.
+    required: false
+    default: test-results
+  snapshot-dir:
+    description: Directory holding the baseline images, named <test-name>.png.
+    required: false
+    default: .screenshot-baselines
+  branch-prefix:
+    description: Branch the screenshots are pushed to. The pull request number is appended.
+    required: false
+    default: screenshot-diffs/pr-
+
+runs:
+  using: composite
+  steps:
+    - name: Collect screenshots
+      id: collect
+      shell: bash
+      env:
+        TEST_RESULTS_DIR: ${{ inputs.test-results-dir }}
+        SNAPSHOT_DIR: ${{ inputs.snapshot-dir }}
+        COLLECT_SCRIPT: ${{ github.action_path }}/../scripts/diff-collect.sh
+      run: |
+        classification="$(bash "$COLLECT_SCRIPT" "$TEST_RESULTS_DIR" "$SNAPSHOT_DIR" screenshot-diffs)"
+        if [ -z "$classification" ]; then
+          echo "has_screenshots=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        echo "has_screenshots=true" >> "$GITHUB_OUTPUT"
+        {
+          echo "classification<<CLASSIFICATION_EOF"
+          printf '%s\n' "$classification"
+          echo "CLASSIFICATION_EOF"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Push screenshots to side branch
+      id: push
+      if: ${{ steps.collect.outputs.has_screenshots == 'true' }}
+      shell: bash
+      env:
+        PR_NUMBER: ${{ inputs.pr-number }}
+        BRANCH_PREFIX: ${{ inputs.branch-prefix }}
+        GH_TOKEN: ${{ inputs.github-token }}
+        GIT_IDENTITY_NAME: ${{ inputs.committer-name }}
+        GIT_IDENTITY_EMAIL: ${{ inputs.committer-email }}
+        REPLACE_BRANCH_WITH_DIR: ${{ github.action_path }}/../scripts/replace-branch-with-dir.sh
+      run: |
+        mv screenshot-diffs /tmp/screenshot-diffs
+        bash "$REPLACE_BRANCH_WITH_DIR" \
+          "${BRANCH_PREFIX}${PR_NUMBER}" \
+          /tmp/screenshot-diffs \
+          "chore: screenshots for PR #${PR_NUMBER}"
+
+    - name: Write screenshot review summary
+      if: ${{ always() }}
+      shell: bash
+      env:
+        HAS_SCREENSHOTS: ${{ steps.collect.outputs.has_screenshots }}
+        CLASSIFICATION: ${{ steps.collect.outputs.classification }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        BRANCH_PREFIX: ${{ inputs.branch-prefix }}
+        PUSH_OUTCOME: ${{ steps.push.outcome }}
+        SUMMARY_SCRIPT: ${{ github.action_path }}/../scripts/diff-summary.sh
+      run: |
+        if [ "$HAS_SCREENSHOTS" != "true" ]; then
+          {
+            echo "> [!CAUTION]"
+            echo "> Screenshot tests failed but produced no screenshot image (likely a non-comparison failure such as a timeout)."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+        if [ "$PUSH_OUTCOME" != "success" ]; then
+          {
+            echo "> [!WARNING]"
+            echo "> Screenshots were collected but could not be published (push outcome: ${PUSH_OUTCOME}). See the \"Push screenshots to side branch\" step for details."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+        base_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/raw/refs/heads/${BRANCH_PREFIX}${PR_NUMBER}"
+        printf '%s\n' "$CLASSIFICATION" | bash "$SUMMARY_SCRIPT" "$base_url" >> "$GITHUB_STEP_SUMMARY"

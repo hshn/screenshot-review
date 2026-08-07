@@ -1,0 +1,58 @@
+name: Run Playwright
+description: |
+  Run a command inside the official Playwright image. The image ships the browsers and
+  fonts the baselines were captured with; running on the host instead makes the same
+  screenshots differ by font metrics alone.
+
+inputs:
+  command:
+    description: Command to run inside the container, e.g. "node --run test:screenshot".
+    required: true
+  version:
+    description: Playwright version to use. Defaults to the installed @playwright/test.
+    required: false
+    default: ''
+  image:
+    description: Full image reference. Overrides both the resolved and the requested version.
+    required: false
+    default: ''
+
+outputs:
+  version:
+    description: The Playwright version the image was chosen for. Empty when image was given.
+    value: ${{ steps.resolve.outputs.version }}
+  image:
+    description: The image the command ran in.
+    value: ${{ steps.resolve.outputs.image }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve Playwright image
+      id: resolve
+      shell: bash
+      env:
+        REQUESTED_VERSION: ${{ inputs.version }}
+        REQUESTED_IMAGE: ${{ inputs.image }}
+        RESOLVE_SCRIPT: ${{ github.action_path }}/../scripts/resolve-playwright-image.mjs
+      run: |
+        if [ -n "$REQUESTED_IMAGE" ]; then
+          {
+            echo "version="
+            echo "image=${REQUESTED_IMAGE}"
+          } >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        if [ -n "$REQUESTED_VERSION" ]; then
+          node "$RESOLVE_SCRIPT" --version "$REQUESTED_VERSION" > /dev/null
+        else
+          node "$RESOLVE_SCRIPT" > /dev/null
+        fi
+
+    - name: Run
+      shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
+        IMAGE: ${{ steps.resolve.outputs.image }}
+        RUN_SCRIPT: ${{ github.action_path }}/../scripts/run.mjs
+      run: node "$RUN_SCRIPT" --command "$COMMAND" --image "$IMAGE"

@@ -1,0 +1,63 @@
+# Note: this only becomes reachable once this directory is the root of its own repository.
+# GitHub reads reusable workflows from the repository root's .github/workflows only.
+name: Screenshot Approval
+
+on:
+  workflow_call:
+    inputs:
+      label:
+        description: Label that approves the screenshots.
+        required: false
+        type: string
+        default: screenshot-approved
+      status-context:
+        description: Status name written on approval. Must match the one the tests write.
+        required: false
+        type: string
+        default: Screenshot Review
+
+jobs:
+  approve:
+    name: Approve
+    if: |
+      github.event.action == 'labeled'
+      && github.event.label.name == inputs.label
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      # Statuses are per commit, so an approval does not carry over to later commits. It
+      # expires without the label being removed.
+      - name: Approve screenshot review
+        uses: ./review-status
+        with:
+          sha: ${{ github.event.pull_request.head.sha }}
+          state: success
+          context: ${{ inputs.status-context }}
+          description: Reviewed by @${{ github.event.sender.login }}
+          github-token: ${{ github.token }}
+
+  revoke:
+    name: Revoke
+    # Leaving it on would let the label point at an approval that has already expired,
+    # which lies about the state.
+    if: |
+      github.event.action == 'synchronize'
+      && contains(github.event.pull_request.labels.*.name, inputs.label)
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Remove the approval label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          LABEL: ${{ inputs.label }}
+        run: gh pr edit "$PR_NUMBER" --remove-label "$LABEL"

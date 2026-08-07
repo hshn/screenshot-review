@@ -1,0 +1,17 @@
+{
+  "name": "screenshot-review",
+  "version": "0.0.0",
+  "description": "Review screenshot changes on a pull request, with baselines kept out of the working tree.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "screenshot-review": "bin/cli.mjs"
+  },
+  "files": [
+    "bin",
+    "scripts"
+  ],
+  "scripts": {
+    "test": "node --test 'tests/**/*.test.mjs'"
+  }
+}

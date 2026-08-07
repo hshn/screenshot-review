@@ -1,0 +1,52 @@
+name: Pull screenshot baselines
+description: |
+  Fetch one generation of baseline images from the branch that stores them. By default it
+  takes the generation captured at this branch's merge-base with the base branch, falling
+  back to the latest one and reporting the fallback through the note output.
+
+inputs:
+  branch:
+    description: Branch that stores the baseline generations.
+    required: false
+    default: screenshot-baselines
+  dir:
+    description: Directory the baselines are written to.
+    required: false
+    default: .screenshot-baselines
+  ref:
+    description: Generation to take. A commit SHA, or "latest". Defaults to the branch point.
+    required: false
+    default: ''
+  base-branch:
+    description: Branch the branch point is computed against. Ignored when ref is given.
+    required: false
+    default: ${{ github.event.repository.default_branch }}
+
+outputs:
+  sha:
+    description: The generation that was pulled. Empty when no baselines were found.
+    value: ${{ steps.pull.outputs.sha }}
+  note:
+    description: Why the requested generation was not used. Empty when it was.
+    value: ${{ steps.pull.outputs.note }}
+
+runs:
+  using: composite
+  steps:
+    - name: Pull baselines
+      id: pull
+      shell: bash
+      env:
+        BRANCH: ${{ inputs.branch }}
+        DIR: ${{ inputs.dir }}
+        REF: ${{ inputs.ref }}
+        BASE_BRANCH: ${{ inputs.base-branch }}
+        PULL_SCRIPT: ${{ github.action_path }}/../scripts/baseline-pull.mjs
+      run: |
+        args=(--branch "$BRANCH" --dir "$DIR")
+        if [ -n "$REF" ]; then
+          args+=(--ref "$REF")
+        else
+          args+=(--base-branch "$BASE_BRANCH")
+        fi
+        node "$PULL_SCRIPT" "${args[@]}"

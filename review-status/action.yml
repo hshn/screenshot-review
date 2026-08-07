@@ -1,0 +1,71 @@
+name: Write screenshot review status
+description: |
+  Write the commit status that gates a pull request on a human having looked at the
+  screenshots. Statuses are per commit, so a new push silently drops an earlier approval.
+
+inputs:
+  sha:
+    description: Commit the status is written for.
+    required: true
+  state:
+    description: One of success, failure, pending, error.
+    required: true
+  github-token:
+    description: Token used to write the status. Needs statuses write.
+    required: true
+  context:
+    description: Status name. This is what a branch ruleset requires.
+    required: false
+    default: Screenshot Review
+  description:
+    description: Status description. Defaults to wording chosen from the state.
+    required: false
+    default: ''
+  note:
+    description: Appended to the description after a slash. Used for the baseline fallback note.
+    required: false
+    default: ''
+  target-url:
+    description: Where the status links to. Defaults to this workflow run.
+    required: false
+    default: ''
+  approval-label:
+    description: Label named in the default failure description.
+    required: false
+    default: screenshot-approved
+
+runs:
+  using: composite
+  steps:
+    - name: Write status
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        HEAD_SHA: ${{ inputs.sha }}
+        STATE: ${{ inputs.state }}
+        CONTEXT: ${{ inputs.context }}
+        DESCRIPTION: ${{ inputs.description }}
+        NOTE: ${{ inputs.note }}
+        TARGET_URL: ${{ inputs.target-url }}
+        APPROVAL_LABEL: ${{ inputs.approval-label }}
+      run: |
+        description="$DESCRIPTION"
+        if [ -z "$description" ]; then
+          if [ "$STATE" = "success" ]; then
+            description="No visual differences"
+          else
+            description="Visual differences found. Review them and add the ${APPROVAL_LABEL} label"
+          fi
+        fi
+        if [ -n "$NOTE" ]; then
+          description="${description} / ${NOTE}"
+        fi
+        target_url="$TARGET_URL"
+        if [ -z "$target_url" ]; then
+          target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+        fi
+        gh api -X POST "repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
+          -f state="$STATE" \
+          -f context="$CONTEXT" \
+          -f description="${description:0:140}" \
+          -f target_url="$target_url"

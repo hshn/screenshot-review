@@ -1,0 +1,49 @@
+name: Publish screenshot baselines
+description: |
+  Publish one generation of baseline images to the branch that stores them. The branch is
+  rebuilt from scratch as a single commit every time, keeping the most recent generations
+  and dropping the rest.
+
+inputs:
+  sha:
+    description: Commit the generation is captured for. Used as the generation's name.
+    required: true
+  github-token:
+    description: Token used to push to the branch. Needs contents write.
+    required: true
+  branch:
+    description: Branch that stores the baseline generations.
+    required: false
+    default: screenshot-baselines
+  dir:
+    description: Directory the baselines are read from.
+    required: false
+    default: .screenshot-baselines
+  keep:
+    description: How many generations to keep.
+    required: false
+    default: '100'
+  committer-name:
+    description: Name recorded as the committer.
+    required: false
+    default: github-actions[bot]
+  committer-email:
+    description: Email recorded as the committer.
+    required: false
+    default: 41898282+github-actions[bot]@users.noreply.github.com
+
+runs:
+  using: composite
+  steps:
+    - name: Publish baselines
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        GIT_IDENTITY_NAME: ${{ inputs.committer-name }}
+        GIT_IDENTITY_EMAIL: ${{ inputs.committer-email }}
+        SHA: ${{ inputs.sha }}
+        BRANCH: ${{ inputs.branch }}
+        DIR: ${{ inputs.dir }}
+        KEEP: ${{ inputs.keep }}
+        PUBLISH_SCRIPT: ${{ github.action_path }}/../scripts/baseline-publish.sh
+      run: bash "$PUBLISH_SCRIPT" --sha "$SHA" --branch "$BRANCH" --dir "$DIR" --keep "$KEEP"
