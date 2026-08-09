@@ -157,3 +157,19 @@ Another backing store — snapshots committed in the tree, a workflow artifact, 
 storage — belongs as a **separate pair of actions with the same inputs and outputs**, not
 as a `storage` input on these. An input for a store nobody has built yet would be shaped
 by guesswork, and would not fit whatever is actually needed later.
+
+## Releasing
+
+`.github/workflows/approval.yml` refers to this repository's own `review-status`
+action. GitHub Actions does not allow expressions in `uses:`, so the ref is a
+literal and does not follow the tag it is released under. Bump it by hand, in
+this order:
+
+1. Rewrite `review-status@<previous tag>` in `.github/workflows/approval.yml` to
+   the new tag.
+2. Bump `version` in `package.json`.
+3. Commit.
+4. Tag that commit.
+
+Skipping step 1 leaves a silent version skew: a caller asking for
+`approval.yml@v1.1.0` still runs the v1.0.0 action.
