@@ -1,5 +1,3 @@
-# Note: this only becomes reachable once this directory is the root of its own repository.
-# GitHub reads reusable workflows from the repository root's .github/workflows only.
 name: Screenshot Approval
 
 on:
@@ -27,15 +25,10 @@ jobs:
       contents: read
       statuses: write
     steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          persist-credentials: false
-
       # Statuses are per commit, so an approval does not carry over to later commits. It
       # expires without the label being removed.
       - name: Approve screenshot review
-        uses: ./review-status
+        uses: hshn/screenshot-review/review-status@v1.0.0
         with:
           sha: ${{ github.event.pull_request.head.sha }}
           state: success
