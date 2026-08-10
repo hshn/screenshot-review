@@ -61,24 +61,24 @@ jobs:
 
       - name: Pull baseline
         id: baseline
-        uses: ./tools/screenshot-review/baseline-pull
+        uses: hshn/screenshot-review/baseline-pull@v1.0.0
 
       - name: Run screenshot tests
         id: screenshot
-        uses: ./tools/screenshot-review/run
+        uses: hshn/screenshot-review/run@v1.0.0
         with:
           command: npx playwright test
 
       - name: Report diffs
         if: failure() && steps.screenshot.outcome == 'failure'
-        uses: ./tools/screenshot-review/diff-report
+        uses: hshn/screenshot-review/diff-report@v1.0.0
         with:
           pr-number: ${{ github.event.pull_request.number }}
           github-token: ${{ github.token }}
 
       - name: Write status
         if: always()
-        uses: ./tools/screenshot-review/review-status
+        uses: hshn/screenshot-review/review-status@v1.0.0
         with:
           sha: ${{ github.event.pull_request.head.sha }}
           state: ${{ steps.screenshot.outcome == 'success' && 'success' || 'failure' }}
@@ -108,11 +108,6 @@ label writes the success status, and a later push revokes it. It takes two input
 `label` (default `screenshot-approved`) and `status-context` (default
 `Screenshot Review`, matched against `review-status`'s own `context` default), so
 callers can rename either without editing the workflow.
-
-It becomes callable with `uses:` only once this directory is the root of its own
-repository — GitHub resolves reusable workflows solely from a repository's own
-`.github/workflows`, and today's path (`tools/screenshot-review/.github/workflows/`)
-is not that.
 
 ## Playwright config
 
