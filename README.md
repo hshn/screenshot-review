@@ -61,24 +61,24 @@ jobs:
 
       - name: Pull baseline
         id: baseline
-        uses: hshn/screenshot-review/baseline-pull@v1.0.0
+        uses: hshn/screenshot-review/baseline-pull@v0.1.0
 
       - name: Run screenshot tests
         id: screenshot
-        uses: hshn/screenshot-review/run@v1.0.0
+        uses: hshn/screenshot-review/run@v0.1.0
         with:
           command: npx playwright test
 
       - name: Report diffs
         if: failure() && steps.screenshot.outcome == 'failure'
-        uses: hshn/screenshot-review/diff-report@v1.0.0
+        uses: hshn/screenshot-review/diff-report@v0.1.0
         with:
           pr-number: ${{ github.event.pull_request.number }}
           github-token: ${{ github.token }}
 
       - name: Write status
         if: always()
-        uses: hshn/screenshot-review/review-status@v1.0.0
+        uses: hshn/screenshot-review/review-status@v0.1.0
         with:
           sha: ${{ github.event.pull_request.head.sha }}
           state: ${{ steps.screenshot.outcome == 'success' && 'success' || 'failure' }}
@@ -167,4 +167,4 @@ this order:
 4. Tag that commit.
 
 Skipping step 1 leaves a silent version skew: a caller asking for
-`approval.yml@v1.1.0` still runs the v1.0.0 action.
+`approval.yml@v0.2.0` still runs the v0.1.0 action.

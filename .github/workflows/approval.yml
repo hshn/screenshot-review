@@ -28,7 +28,7 @@ jobs:
       # Statuses are per commit, so an approval does not carry over to later commits. It
       # expires without the label being removed.
       - name: Approve screenshot review
-        uses: hshn/screenshot-review/review-status@v1.0.0
+        uses: hshn/screenshot-review/review-status@v0.1.0
         with:
           sha: ${{ github.event.pull_request.head.sha }}
           state: success
