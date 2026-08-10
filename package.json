@@ -2,7 +2,7 @@
   "name": "screenshot-review",
   "version": "1.0.0",
   "description": "Review screenshot changes on a pull request, with baselines kept out of the working tree.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "bin": {
     "screenshot-review": "bin/cli.mjs"
