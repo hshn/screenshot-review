@@ -111,23 +111,19 @@ callers can rename either without editing the workflow.
 
 ## Playwright config
 
-The comparison is only as good as its threshold. Playwright's default `threshold` of 0.2
-ignores anything under a 21% luminance change, which is enough to miss a panel being
-rebuilt from empty to full when the surface and its border sit close in luminance.
+One setting this workflow requires: `baseline-pull` writes the generation it fetched to
+`snapshotPathTemplate`, so the suite has to read its baselines from the same place.
 
 ```ts
 export default defineConfig({
   // Baselines are not shared through the working tree; baseline-pull writes them here.
   snapshotPathTemplate: '.screenshot-baselines/{arg}{ext}',
-  expect: {
-    toHaveScreenshot: {
-      threshold: 0.03,
-      maxDiffPixelRatio: 0.01,
-      animations: 'disabled',
-    },
-  },
 });
 ```
+
+What counts as a change — `threshold`, `maxDiffPixels`, `maxDiffPixelRatio` — depends on
+what your screenshots contain, and is Playwright's to define rather than this workflow's:
+see [`toHaveScreenshot`](https://playwright.dev/docs/api/class-pageassertions#page-assertions-to-have-screenshot-1).
 
 Capture and compare in the same rendering environment. Fonts differ enough between a
 developer's machine and a Linux container to produce a difference on every screenshot,
