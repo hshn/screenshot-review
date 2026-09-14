@@ -32,7 +32,7 @@ jobs:
       # keeps the tests' link: the screenshots are on that run, and there is nothing to
       # see on this one.
       - name: Approve screenshot review
-        uses: hshn/screenshot-review/review-status@v0.1.0
+        uses: hshn/screenshot-review/review-status@v0.2.0
         with:
           sha: ${{ github.event.pull_request.head.sha }}
           state: success

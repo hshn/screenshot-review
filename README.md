@@ -61,24 +61,24 @@ jobs:
 
       - name: Pull baseline
         id: baseline
-        uses: hshn/screenshot-review/baseline-pull@v0.1.0
+        uses: hshn/screenshot-review/baseline-pull@v0.2.0
 
       - name: Run screenshot tests
         id: screenshot
-        uses: hshn/screenshot-review/run@v0.1.0
+        uses: hshn/screenshot-review/run@v0.2.0
         with:
           command: npx playwright test
 
       - name: Report diffs
         if: failure() && steps.screenshot.outcome == 'failure'
-        uses: hshn/screenshot-review/diff-report@v0.1.0
+        uses: hshn/screenshot-review/diff-report@v0.2.0
         with:
           pr-number: ${{ github.event.pull_request.number }}
           github-token: ${{ github.token }}
 
       - name: Write status
         if: always()
-        uses: hshn/screenshot-review/review-status@v0.1.0
+        uses: hshn/screenshot-review/review-status@v0.2.0
         with:
           sha: ${{ github.event.pull_request.head.sha }}
           state: ${{ steps.screenshot.outcome == 'success' && 'success' || 'failure' }}
@@ -167,7 +167,8 @@ literal and does not follow the tag it is released under. Bump it by hand, in
 this order:
 
 1. Rewrite `review-status@<previous tag>` in `.github/workflows/approval.yml` to
-   the new tag.
+   the new tag, and the `@<previous tag>` refs in the examples above with it — a
+   caller copying them should get the release, not the one before.
 2. Bump `version` in `package.json`.
 3. Commit.
 4. Tag that commit.
