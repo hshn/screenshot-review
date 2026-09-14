@@ -109,6 +109,16 @@ label writes the success status, and a later push revokes it. It takes two input
 `Screenshot Review`, matched against `review-status`'s own `context` default), so
 callers can rename either without editing the workflow.
 
+The pull request page shows only the latest status per context, so the approval keeps
+the link of the status it replaces: Details still opens the tests' run, where the
+screenshots are, and the description says who approved. If the label lands before the
+tests have written their status, there is nothing to keep and the approval links to its
+own run — the tests' status then overwrites it anyway, and the label has to be added
+again once they finish.
+
+The same is available to a hand-written approval job through `review-status`'s
+`keep-target-url` input.
+
 ## Playwright config
 
 One setting this workflow requires: `baseline-pull` writes the generation it fetched to
@@ -164,3 +174,9 @@ this order:
 
 Skipping step 1 leaves a silent version skew: a caller asking for
 `approval.yml@v0.2.0` still runs the v0.1.0 action.
+
+A release changes nothing for a caller until the caller moves its own `uses:` refs —
+both the actions in its screenshot job and `approval.yml` in its approval workflow.
+Bumping one and not the other leaves the old behavior in place without a word, so
+treat the callers' bumps as the last step of the release, not as someone else's
+follow-up.
