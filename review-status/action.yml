@@ -29,6 +29,13 @@ inputs:
     description: Where the status links to. Defaults to this workflow run.
     required: false
     default: ''
+  keep-target-url:
+    description: |
+      Keep the link of the status this one replaces. An approval flips the state of the
+      status the tests wrote, and the screenshots are on the tests' run, not on this one.
+      Falls back to target-url when no status with this context exists yet.
+    required: false
+    default: 'false'
   approval-label:
     description: Label named in the default failure description.
     required: false
@@ -47,7 +54,9 @@ runs:
         DESCRIPTION: ${{ inputs.description }}
         NOTE: ${{ inputs.note }}
         TARGET_URL: ${{ inputs.target-url }}
+        KEEP_TARGET_URL: ${{ inputs.keep-target-url }}
         APPROVAL_LABEL: ${{ inputs.approval-label }}
+        LOOKUP_SCRIPT: ${{ github.action_path }}/../scripts/status-target-url.mjs
       run: |
         description="$DESCRIPTION"
         if [ -z "$description" ]; then
@@ -60,7 +69,13 @@ runs:
         if [ -n "$NOTE" ]; then
           description="${description} / ${NOTE}"
         fi
-        target_url="$TARGET_URL"
+        target_url=""
+        if [ "$KEEP_TARGET_URL" = "true" ]; then
+          target_url="$(node "$LOOKUP_SCRIPT" --sha "$HEAD_SHA" --context "$CONTEXT")"
+        fi
+        if [ -z "$target_url" ]; then
+          target_url="$TARGET_URL"
+        fi
         if [ -z "$target_url" ]; then
           target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
         fi
