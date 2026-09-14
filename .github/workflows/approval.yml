@@ -27,6 +27,10 @@ jobs:
     steps:
       # Statuses are per commit, so an approval does not carry over to later commits. It
       # expires without the label being removed.
+      #
+      # The pull request page shows only the latest status per context, so this one
+      # keeps the tests' link: the screenshots are on that run, and there is nothing to
+      # see on this one.
       - name: Approve screenshot review
         uses: hshn/screenshot-review/review-status@v0.1.0
         with:
@@ -34,6 +38,7 @@ jobs:
           state: success
           context: ${{ inputs.status-context }}
           description: Reviewed by @${{ github.event.sender.login }}
+          keep-target-url: true
           github-token: ${{ github.token }}
 
   revoke:
