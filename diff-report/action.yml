@@ -67,10 +67,11 @@ runs:
         REPLACE_BRANCH_WITH_DIR: ${{ github.action_path }}/../scripts/replace-branch-with-dir.sh
       run: |
         mv screenshot-diffs /tmp/screenshot-diffs
-        bash "$REPLACE_BRANCH_WITH_DIR" \
+        commit="$(bash "$REPLACE_BRANCH_WITH_DIR" \
           "${BRANCH_PREFIX}${PR_NUMBER}" \
           /tmp/screenshot-diffs \
-          "chore: screenshots for PR #${PR_NUMBER}"
+          "chore: screenshots for PR #${PR_NUMBER}")"
+        echo "commit=${commit}" >> "$GITHUB_OUTPUT"
 
     - name: Write screenshot review summary
       if: ${{ always() }}
@@ -78,9 +79,8 @@ runs:
       env:
         HAS_SCREENSHOTS: ${{ steps.collect.outputs.has_screenshots }}
         CLASSIFICATION: ${{ steps.collect.outputs.classification }}
-        PR_NUMBER: ${{ inputs.pr-number }}
-        BRANCH_PREFIX: ${{ inputs.branch-prefix }}
         PUSH_OUTCOME: ${{ steps.push.outcome }}
+        PUSHED_COMMIT: ${{ steps.push.outputs.commit }}
         SUMMARY_SCRIPT: ${{ github.action_path }}/../scripts/diff-summary.sh
       run: |
         if [ "$HAS_SCREENSHOTS" != "true" ]; then
@@ -97,5 +97,9 @@ runs:
           } >> "$GITHUB_STEP_SUMMARY"
           exit 0
         fi
-        base_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/raw/refs/heads/${BRANCH_PREFIX}${PR_NUMBER}"
+        # Link to the commit just pushed, not the branch: the branch is force-pushed by every
+        # run, and raw files by branch are cached for minutes, so a branch URL can show
+        # another run's screenshots. GitHub keeps serving a commit by SHA after the
+        # force-push leaves it unreachable.
+        base_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/raw/${PUSHED_COMMIT}"
         printf '%s\n' "$CLASSIFICATION" | bash "$SUMMARY_SCRIPT" "$base_url" >> "$GITHUB_STEP_SUMMARY"
