@@ -1,0 +1,40 @@
+name: PR Title
+
+# Pull requests are squash-merged and the title becomes the commit on main, so this is the
+# only place that checks what the release tooling will read. The commit-msg hook's
+# commits are gone after the squash.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  commitlint:
+    name: Lint PR Title
+    # A bot's title is not ours to write; the release pull request's
+    # `chore(main): release ...` is one.
+    if: github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint PR title
+        env:
+          # The " (#N)" the squash appends is left out, so the limit costs the same at
+          # every PR number.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s' "$PR_TITLE" | npx --no -- commitlint
