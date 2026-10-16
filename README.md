@@ -104,6 +104,11 @@ export default defineConfig({
 });
 ```
 
+`updateSnapshots` can stay at Playwright's default. A screenshot with no baseline then
+fails and Playwright writes its actual image into that directory, but `baseline-pull`
+also leaves a `.pulled` file there listing what it fetched, and `diff-report` judges by
+that list — so the screenshot is reported as added, not as changed against itself.
+
 What counts as a change — `threshold`, `maxDiffPixels`, `maxDiffPixelRatio` — depends on
 what your screenshots contain, and is Playwright's to define rather than this workflow's:
 see [`toHaveScreenshot`](https://playwright.dev/docs/api/class-pageassertions#page-assertions-to-have-screenshot-1).

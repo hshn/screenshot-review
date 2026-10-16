@@ -23,7 +23,9 @@ inputs:
     required: false
     default: test-results
   snapshot-dir:
-    description: Directory holding the baseline images, named <test-name>.png.
+    description: |
+      Directory holding the baseline images, named <test-name>.png. When baseline-pull's
+      .pulled record is there, only the images it lists count as baselines.
     required: false
     default: .screenshot-baselines
   branch-prefix:
