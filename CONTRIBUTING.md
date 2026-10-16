@@ -9,6 +9,17 @@ node --run test
 CI runs the same command on every pull request, with the Node version in
 `.node-version`.
 
+## Storage
+
+`baseline-pull` and `baseline-publish` promise exactly one thing between them: a directory
+of PNGs goes out and comes back. That the directory happens to travel on a branch is
+inside the implementation.
+
+Another backing store — snapshots committed in the tree, a workflow artifact, object
+storage — belongs as a **separate pair of actions with the same inputs and outputs**, not
+as a `storage` input on these. An input for a store nobody has built yet would be shaped
+by guesswork, and would not fit whatever is actually needed later.
+
 ## Pull request titles
 
 Pull requests are squash-merged, and the title becomes the commit on `main`. Write it as

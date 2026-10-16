@@ -92,35 +92,6 @@ The job grants `contents: write` so `diff-report`'s token can push the side bran
 needs. A token scoped separately (a GitHub App installation token, for instance) is the
 tighter alternative to widening the whole job's permissions for one conditional step.
 
-## Command line
-
-`bin/cli.mjs` is the local equivalent of the actions above, exposed as the
-`screenshot-review` bin. It runs the same scripts the actions call, so what passes
-locally passes in CI:
-
-```sh
-screenshot-review baseline pull --base-branch develop
-screenshot-review run --command "npx playwright test"
-```
-
-## Approval workflow
-
-`.github/workflows/approval.yml` is a reusable workflow: a human adding the approval
-label writes the success status, and a later push revokes it. It takes two inputs,
-`label` (default `screenshot-approved`) and `status-context` (default
-`Screenshot Review`, matched against `review-status`'s own `context` default), so
-callers can rename either without editing the workflow.
-
-The pull request page shows only the latest status per context, so the approval keeps
-the link of the status it replaces: Details still opens the tests' run, where the
-screenshots are, and the description says who approved. If the label lands before the
-tests have written their status, there is nothing to keep and the approval links to its
-own run — the tests' status then overwrites it anyway, and the label has to be added
-again once they finish.
-
-The same is available to a hand-written approval job through `review-status`'s
-`keep-target-url` input.
-
 ## Playwright config
 
 One setting this workflow requires: `baseline-pull` writes the generation it fetched to
@@ -141,6 +112,65 @@ Capture and compare in the same rendering environment. Fonts differ enough betwe
 developer's machine and a Linux container to produce a difference on every screenshot,
 which is why `run` goes through the Playwright image rather than the host.
 
+## Approval workflow
+
+`.github/workflows/approval.yml` is a reusable workflow: a human adding the approval
+label writes the success status, and a later push revokes it. Call it on the two pull
+request events it acts on:
+
+<!-- x-release-please-start-version -->
+```yaml
+name: Screenshot Approval
+
+on:
+  pull_request:
+    types: [labeled, synchronize]
+
+jobs:
+  approval:
+    uses: hshn/screenshot-review/.github/workflows/approval.yml@v0.2.0
+    permissions:
+      contents: read
+      statuses: write
+      pull-requests: write
+```
+<!-- x-release-please-end -->
+
+Approving writes the status, so it needs `statuses: write`; revoking removes the label,
+so it needs `pull-requests: write`.
+
+It takes two inputs, `label` (default `screenshot-approved`) and `status-context`
+(default `Screenshot Review`, matched against `review-status`'s own `context` default),
+so callers can rename either without editing the workflow.
+
+The pull request page shows only the latest status per context, so the approval keeps
+the link of the status it replaces: Details still opens the tests' run, where the
+screenshots are, and the description says who approved. If the label lands before the
+tests have written their status, there is nothing to keep and the approval links to its
+own run — the tests' status then overwrites it anyway, and the label has to be added
+again once they finish.
+
+The same is available to a hand-written approval job through `review-status`'s
+`keep-target-url` input.
+
+## Upgrading
+
+A release changes nothing for a caller until the caller moves its own `uses:` refs —
+both the actions in its screenshot job and `approval.yml` in its approval workflow.
+Bumping one and not the other leaves the old behavior in place without a word, so move
+them together. Each release's changes are in `CHANGELOG.md` and on the GitHub release.
+
+## Command line
+
+`bin/cli.mjs` is the local equivalent of the actions above, exposed as the
+`screenshot-review` bin. It runs the same scripts the actions call, so what passes
+locally passes in CI:
+
+```sh
+screenshot-review baseline pull --base-branch develop
+screenshot-review run --command "npx playwright test"
+```
+
 ## Working directory
 
 `run`'s default image comes from the installed `@playwright/test` version, resolved via
@@ -149,21 +179,3 @@ is not where the repository's `package.json` lives — a monorepo whose screensh
 sits in a subpackage, for instance — that resolution can find the wrong installation or
 none at all. Pass `version:` or `image:` explicitly in that case instead of relying on
 the default.
-
-## Storage
-
-`baseline-pull` and `baseline-publish` promise exactly one thing between them: a directory
-of PNGs goes out and comes back. That the directory happens to travel on a branch is
-inside the implementation.
-
-Another backing store — snapshots committed in the tree, a workflow artifact, object
-storage — belongs as a **separate pair of actions with the same inputs and outputs**, not
-as a `storage` input on these. An input for a store nobody has built yet would be shaped
-by guesswork, and would not fit whatever is actually needed later.
-
-## Upgrading
-
-A release changes nothing for a caller until the caller moves its own `uses:` refs —
-both the actions in its screenshot job and `approval.yml` in its approval workflow.
-Bumping one and not the other leaves the old behavior in place without a word, so move
-them together. Each release's changes are in `CHANGELOG.md` and on the GitHub release.
