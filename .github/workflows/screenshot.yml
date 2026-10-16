@@ -1,7 +1,8 @@
 name: Screenshot
 
 # The actions are referenced by path, so every run exercises them as the checked-out
-# commit has them: a pull request tests its own changes to them before any release does.
+# commit has them. A pull request runs only the review job, though: changes to
+# baseline-publish are first exercised by the push to main that merges them.
 on:
   push:
     branches: [main]
