@@ -14,6 +14,18 @@ OUT_DIR="${3:?usage: $0 <test-results-dir> <snapshot-dir> <out-dir>}"
 
 mkdir -p "$OUT_DIR"
 
+# A baseline on disk is not proof it was pulled: Playwright's default updateSnapshots
+# 'missing' writes the actual image where a missing baseline would be. baseline-pull
+# records what it fetched, so judge by that record when there is one.
+PULLED="${SNAPSHOT_DIR}/.pulled"
+has_baseline() {
+  if [ -f "$PULLED" ]; then
+    grep -qxF "$1.png" "$PULLED"
+  else
+    [ -f "${SNAPSHOT_DIR}/$1.png" ]
+  fi
+}
+
 while IFS= read -r actual_path; do
   name="$(basename "$actual_path" -actual.png)"
   test_dir="$(dirname "$actual_path")"
@@ -21,7 +33,7 @@ while IFS= read -r actual_path; do
   cp "$actual_path" "${OUT_DIR}/${name}-actual.png"
 
   baseline="${SNAPSHOT_DIR}/${name}.png"
-  if [ ! -f "$baseline" ]; then
+  if ! has_baseline "$name"; then
     printf 'added\t%s\tactual\n' "$name"
     continue
   fi
