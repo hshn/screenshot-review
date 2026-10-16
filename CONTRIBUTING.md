@@ -9,6 +9,24 @@ node --run test
 CI runs the same command on every pull request, with the Node version in
 `.node-version`.
 
+## Screenshot suite
+
+`screenshots/` is a one-screenshot Playwright suite that exists to run this repository's
+own actions. `.github/workflows/screenshot.yml` calls them by path (`uses: ./run`, …), so a
+pull request runs them as it changed them, not as the last release has them. A push to
+`main` publishes a baseline generation; a pull request compares against it, and approval
+goes through `.github/workflows/approval.yml` the same way a caller's would: add the
+`screenshot-approved` label.
+
+What this does not cover:
+
+- `approval.yml` calls `review-status` by the released tag, so a pull request runs its own
+  `approval.yml` with the last release's `review-status`.
+- A pull request that leaves the screenshots unchanged exercises only the success path. To
+  exercise `diff-report`, change what `screenshots/card.spec.mjs` renders.
+- Pull requests from forks get a read-only token, so pushing the screenshots and writing
+  the status fail.
+
 ## Storage
 
 `baseline-pull` and `baseline-publish` promise exactly one thing between them: a directory
