@@ -46,6 +46,7 @@ reusable workflow cannot grant itself more than its caller's job already has.
 This is how the pieces above compose into one screenshot job. It pulls the baseline,
 runs the comparison, and reports either a diff or a status depending on the outcome:
 
+<!-- x-release-please-start-version -->
 ```yaml
 jobs:
   screenshot:
@@ -85,6 +86,7 @@ jobs:
           note: ${{ steps.baseline.outputs.note }}
           github-token: ${{ github.token }}
 ```
+<!-- x-release-please-end -->
 
 The job grants `contents: write` so `diff-report`'s token can push the side branch it
 needs. A token scoped separately (a GitHub App installation token, for instance) is the
@@ -159,25 +161,9 @@ storage — belongs as a **separate pair of actions with the same inputs and out
 as a `storage` input on these. An input for a store nobody has built yet would be shaped
 by guesswork, and would not fit whatever is actually needed later.
 
-## Releasing
-
-`.github/workflows/approval.yml` refers to this repository's own `review-status`
-action. GitHub Actions does not allow expressions in `uses:`, so the ref is a
-literal and does not follow the tag it is released under. Bump it by hand, in
-this order:
-
-1. Rewrite `review-status@<previous tag>` in `.github/workflows/approval.yml` to
-   the new tag, and the `@<previous tag>` refs in the examples above with it — a
-   caller copying them should get the release, not the one before.
-2. Bump `version` in `package.json`.
-3. Commit.
-4. Tag that commit.
-
-Skipping step 1 leaves a silent version skew: a caller asking for
-`approval.yml@v0.2.0` still runs the v0.1.0 action.
+## Upgrading
 
 A release changes nothing for a caller until the caller moves its own `uses:` refs —
 both the actions in its screenshot job and `approval.yml` in its approval workflow.
-Bumping one and not the other leaves the old behavior in place without a word, so
-treat the callers' bumps as the last step of the release, not as someone else's
-follow-up.
+Bumping one and not the other leaves the old behavior in place without a word, so move
+them together. Each release's changes are in `CHANGELOG.md` and on the GitHub release.
