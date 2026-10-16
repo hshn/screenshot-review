@@ -32,9 +32,9 @@ jobs:
       # keeps the tests' link: the screenshots are on that run, and there is nothing to
       # see on this one.
       #
-      # By tag, not `./review-status`: a path resolves against the calling job's
-      # workspace, which this job never checks out, and which for an external caller
-      # holds the caller's repository, not this one.
+      # By tag, not `./review-status`: a local path resolves against this job's
+      # workspace, which is empty until something checks it out, and a checkout here
+      # fetches the caller's repository, not this one.
       - name: Approve screenshot review
         uses: hshn/screenshot-review/review-status@v0.2.0 # x-release-please-version
         with:
