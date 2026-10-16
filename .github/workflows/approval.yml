@@ -31,6 +31,10 @@ jobs:
       # The pull request page shows only the latest status per context, so this one
       # keeps the tests' link: the screenshots are on that run, and there is nothing to
       # see on this one.
+      #
+      # By tag, not `./review-status`: a local path resolves against this job's
+      # workspace, which is empty until something checks it out, and a checkout here
+      # fetches the caller's repository, not this one.
       - name: Approve screenshot review
         uses: hshn/screenshot-review/review-status@v0.2.0 # x-release-please-version
         with:

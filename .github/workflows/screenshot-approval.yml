@@ -1,0 +1,14 @@
+name: Screenshot Approval
+
+on:
+  pull_request:
+    types: [labeled, synchronize]
+
+jobs:
+  # Runs the pull request's approval.yml, but with the review-status it pins by tag.
+  approval:
+    uses: ./.github/workflows/approval.yml
+    permissions:
+      contents: read
+      statuses: write
+      pull-requests: write
