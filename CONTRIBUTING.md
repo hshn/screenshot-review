@@ -20,6 +20,9 @@ goes through `.github/workflows/approval.yml` the same way a caller's would: add
 
 What this does not cover:
 
+- A pull request runs only the review side. Capturing with `--update-snapshots=all` and
+  `baseline-publish` run on the push to `main`, so a change to them is first exercised
+  after it merges.
 - `approval.yml` calls `review-status` by the released tag, so a pull request runs its own
   `approval.yml` with the last release's `review-status`.
 - A pull request that leaves the screenshots unchanged exercises only the success path. To
