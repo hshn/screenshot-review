@@ -161,36 +161,9 @@ storage — belongs as a **separate pair of actions with the same inputs and out
 as a `storage` input on these. An input for a store nobody has built yet would be shaped
 by guesswork, and would not fit whatever is actually needed later.
 
-## Releasing
-
-Releases are cut by [release-please](https://github.com/googleapis/release-please).
-Every push to `main` keeps a release pull request up to date; merging it tags the merge
-commit and publishes the GitHub release. The next version comes from the Conventional
-Commit types landed since the last tag — `fix` bumps the patch, `feat` the minor, and
-below 1.0.0 a breaking change bumps only the minor.
-
-Besides `version` in `package.json` and `CHANGELOG.md`, the release pull request rewrites
-this repository's own refs to the new tag. GitHub Actions does not allow expressions in
-`uses:`, so `.github/workflows/approval.yml` calls `review-status` by a literal ref that
-does not follow the tag it is released under; without the rewrite, a caller asking for
-`approval.yml@v0.3.0` would still run the previous release's action. The wiring example
-above is rewritten too, so a caller copying it gets the release, not the one before.
-
-release-please rewrites only the lines it is pointed at: a line ending in
-`# x-release-please-version`, or lines between `x-release-please-start-version` and
-`x-release-please-end`, in a file listed under `extra-files` in
-`release-please-config.json`. A new self-reference outside those stays on the old tag
-without a word, so mark it when adding it.
-
-The workflow opens the release pull request as a GitHub App, because a pull request
-opened with `GITHUB_TOKEN` triggers no workflows and CI would never run on it. The App
-needs read and write access to contents, pull requests, issues (for the release labels),
-and workflows (to rewrite `approval.yml`). Its client ID goes in the
-`RELEASE_APP_CLIENT_ID` variable and its private key in the `RELEASE_APP_PRIVATE_KEY`
-secret.
+## Upgrading
 
 A release changes nothing for a caller until the caller moves its own `uses:` refs —
 both the actions in its screenshot job and `approval.yml` in its approval workflow.
-Bumping one and not the other leaves the old behavior in place without a word, so
-treat the callers' bumps as the last step of the release, not as someone else's
-follow-up.
+Bumping one and not the other leaves the old behavior in place without a word, so move
+them together. Each release's changes are in `CHANGELOG.md` and on the GitHub release.
