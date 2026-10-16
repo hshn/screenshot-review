@@ -46,6 +46,7 @@ reusable workflow cannot grant itself more than its caller's job already has.
 This is how the pieces above compose into one screenshot job. It pulls the baseline,
 runs the comparison, and reports either a diff or a status depending on the outcome:
 
+<!-- x-release-please-start-version -->
 ```yaml
 jobs:
   screenshot:
@@ -85,6 +86,7 @@ jobs:
           note: ${{ steps.baseline.outputs.note }}
           github-token: ${{ github.token }}
 ```
+<!-- x-release-please-end -->
 
 The job grants `contents: write` so `diff-report`'s token can push the side branch it
 needs. A token scoped separately (a GitHub App installation token, for instance) is the
@@ -161,20 +163,31 @@ by guesswork, and would not fit whatever is actually needed later.
 
 ## Releasing
 
-`.github/workflows/approval.yml` refers to this repository's own `review-status`
-action. GitHub Actions does not allow expressions in `uses:`, so the ref is a
-literal and does not follow the tag it is released under. Bump it by hand, in
-this order:
+Releases are cut by [release-please](https://github.com/googleapis/release-please).
+Every push to `main` keeps a release pull request up to date; merging it tags the merge
+commit and publishes the GitHub release. The next version comes from the Conventional
+Commit types landed since the last tag — `fix` bumps the patch, `feat` the minor, and
+below 1.0.0 a breaking change bumps only the minor.
 
-1. Rewrite `review-status@<previous tag>` in `.github/workflows/approval.yml` to
-   the new tag, and the `@<previous tag>` refs in the examples above with it — a
-   caller copying them should get the release, not the one before.
-2. Bump `version` in `package.json`.
-3. Commit.
-4. Tag that commit.
+Besides `version` in `package.json` and `CHANGELOG.md`, the release pull request rewrites
+this repository's own refs to the new tag. GitHub Actions does not allow expressions in
+`uses:`, so `.github/workflows/approval.yml` calls `review-status` by a literal ref that
+does not follow the tag it is released under; without the rewrite, a caller asking for
+`approval.yml@v0.3.0` would still run the previous release's action. The wiring example
+above is rewritten too, so a caller copying it gets the release, not the one before.
 
-Skipping step 1 leaves a silent version skew: a caller asking for
-`approval.yml@v0.2.0` still runs the v0.1.0 action.
+release-please rewrites only the lines it is pointed at: a line ending in
+`# x-release-please-version`, or lines between `x-release-please-start-version` and
+`x-release-please-end`, in a file listed under `extra-files` in
+`release-please-config.json`. A new self-reference outside those stays on the old tag
+without a word, so mark it when adding it.
+
+The workflow opens the release pull request as a GitHub App, because a pull request
+opened with `GITHUB_TOKEN` triggers no workflows and CI would never run on it. The App
+needs read and write access to contents, pull requests, issues (for the release labels),
+and workflows (to rewrite `approval.yml`). Its client ID goes in the
+`RELEASE_APP_CLIENT_ID` variable and its private key in the `RELEASE_APP_PRIVATE_KEY`
+secret.
 
 A release changes nothing for a caller until the caller moves its own `uses:` refs —
 both the actions in its screenshot job and `approval.yml` in its approval workflow.
