@@ -1,0 +1,17 @@
+name: Screenshot Approval
+
+on:
+  pull_request:
+    types: [labeled, synchronize]
+
+jobs:
+  # This runs the pull request's approval.yml, but approval.yml calls review-status by
+  # the last release's tag: inside a reusable workflow, `./` resolves against the
+  # caller's repository, so a path ref would break every external caller. A change to
+  # review-status reaches approval only after it is released.
+  approval:
+    uses: ./.github/workflows/approval.yml
+    permissions:
+      contents: read
+      statuses: write
+      pull-requests: write
