@@ -5,6 +5,10 @@
 # checked-out repository authenticates as the checkout's token, not the one passed in.
 set -euo pipefail
 
+#
+# Prints the SHA of the commit it pushed. The branch is force-pushed on every call, so
+# anything that has to keep showing these contents must link to that commit, not to the
+# branch.
 BRANCH="${1:?usage: $0 <branch> <dir> <message>}"
 DIR="${2:?usage: $0 <branch> <dir> <message>}"
 MESSAGE="${3:?usage: $0 <branch> <dir> <message>}"
@@ -30,3 +34,4 @@ git commit -q -m "$MESSAGE"
 GIT_TERMINAL_PROMPT=0 git -c credential.helper= \
   -c credential.helper='!f(){ echo username=x-access-token; echo password="$GH_TOKEN"; };f' \
   push --force --quiet "$REMOTE" "HEAD:refs/heads/${BRANCH}"
+git rev-parse HEAD

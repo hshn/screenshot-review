@@ -109,6 +109,17 @@ describe('replace-branch-with-dir', () => {
     assert.equal(git(remote, ['rev-list', '--count', 'refs/heads/screenshot-diffs/pr-1']).trim(), '1');
   });
 
+  it('prints the commit it pushed, so callers can link to it rather than to the branch', async () => {
+    const remote = tmp('remote-');
+    git(remote, ['init', '-q', '--bare', '.']);
+
+    const dir = tmp('payload-');
+    writeFileSync(join(dir, 'a-diff.png'), 'one');
+    const { stdout } = await run('screenshot-diffs/pr-1', dir, remote);
+
+    assert.equal(stdout.trim(), git(remote, ['rev-parse', 'refs/heads/screenshot-diffs/pr-1']).trim());
+  });
+
   it('refuses to push from a directory that is already a repository', async () => {
     const remote = tmp('remote-');
     git(remote, ['init', '-q', '--bare', '.']);
