@@ -4,7 +4,8 @@
 // pull request compares against what it actually diverged from. When that generation is
 // gone it falls back to the latest one and says so on the way out.
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, rmSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const flag = (name, fallback) => {
   const at = process.argv.indexOf(`--${name}`);
@@ -17,6 +18,7 @@ const REQUESTED_REF = flag('ref', undefined);
 const BASE_BRANCH = flag('base-branch', undefined);
 const LATEST = 'latest';
 const REMOTE_REF = `refs/remotes/origin/${BRANCH}`;
+const PULLED_RECORD = '.pulled';
 
 if (!REQUESTED_REF && !BASE_BRANCH) {
   console.error('Pass --base-branch <name> to compare against its branch point, or --ref <sha|latest>.');
@@ -47,7 +49,17 @@ const lsRemoteStatus = () => {
   }
 };
 
+// Playwright's default updateSnapshots 'missing' writes the actual image into this
+// directory when a baseline is missing, so after the run a file here no longer proves it
+// was a baseline. Record what was actually pulled — an empty record included — for the
+// report to classify against.
+const recordPulled = () => {
+  const files = readdirSync(DEST).sort();
+  writeFileSync(join(DEST, PULLED_RECORD), files.map(file => `${file}\n`).join(''));
+};
+
 const finish = (sha, note) => {
+  recordPulled();
   console.log(sha ? `Baselines: ${sha}${note ? ` — ${note}` : ''}` : `Baselines: none — ${note}`);
   if (process.env.GITHUB_OUTPUT) {
     appendFileSync(process.env.GITHUB_OUTPUT, `sha=${sha ?? ''}\nnote=${note ?? ''}\n`);
