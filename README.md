@@ -14,6 +14,26 @@ the working tree, so pull requests never serialize behind each other's baseline 
 - A human looks at them and adds a label. That flips the status to success. The status is
   per commit, so a new push silently drops the approval.
 
+## What a reviewer sees
+
+Taken from [#19](https://github.com/hshn/screenshot-review/pull/19), a pull request that
+gave the card in this repository's own screenshot suite an accent border.
+
+The job summary shows each screenshot needing review: the baseline, what the pull
+request renders, and the pixels that differ.
+
+<img src="docs/images/review-summary.png" width="1000" alt="Job summary listing the changed card screenshot with its expected, actual and diff images side by side">
+
+The pull request gets a failing `Screenshot Review` status saying what to do next.
+
+<img src="docs/images/review-status-failure.png" width="900" alt="Pull request checks with Screenshot Review failing: Visual differences found. Review them and add the screenshot-approved label">
+
+Adding the `screenshot-approved` label turns it into a success naming the reviewer. The
+`Review screenshots` job stays failed: the label changes the status, not the job, so
+require `Screenshot Review` rather than the job.
+
+<img src="docs/images/review-status-approved.png" width="900" alt="Pull request checks with Screenshot Review passing: Reviewed by @hshn">
+
 ## Actions
 
 | Action             | What it does                                                       |
