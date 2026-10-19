@@ -1,4 +1,4 @@
-name: Screenshot Approval
+name: Screenshot Approval (reusable)
 
 on:
   workflow_call:
