@@ -60,6 +60,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
+      - name: Install dependencies
+        run: npm ci
+
       - name: Pull baseline
         id: baseline
         uses: hshn/screenshot-review/baseline-pull@v0.2.0
@@ -87,6 +90,12 @@ jobs:
           github-token: ${{ github.token }}
 ```
 <!-- x-release-please-end -->
+
+`run` needs the repository's dependencies installed before it starts. It picks its image
+from the `@playwright/test` version installed on the host, and the command it runs in
+the container uses that same installation, since the working directory is mounted into
+it. Passing `version:` or `image:` skips only the first of the two. Install with whatever
+package manager the repository uses; the example uses npm.
 
 The job grants `contents: write` so `diff-report`'s token can push the side branch it
 needs. A token scoped separately (a GitHub App installation token, for instance) is the
