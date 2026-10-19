@@ -31,6 +31,11 @@ function writeBaseline(baselines, file, content) {
   writeFileSync(join(baselines, file), content);
 }
 
+// What baseline-pull leaves behind: one fetched file name per line.
+function recordPulled(baselines, files) {
+  writeFileSync(join(baselines, '.pulled'), files.map(file => `${file}\n`).join(''));
+}
+
 function collect({ results, baselines, out }) {
   const stdout = execFileSync('bash', [collectScript, results, baselines, out], {
     encoding: 'utf8',
@@ -49,6 +54,7 @@ describe('diff-collect', () => {
     writeResult(f.results, 'edit-chromium', 'resource-server-edit-actual.png', 'actual');
     writeResult(f.results, 'edit-chromium', 'resource-server-edit-diff.png', 'diff');
     writeBaseline(f.baselines, 'resource-server-edit.png', 'baseline');
+    recordPulled(f.baselines, ['resource-server-edit.png']);
 
     const { rows, files } = collect(f);
 
@@ -82,10 +88,46 @@ describe('diff-collect', () => {
     assert.deepEqual(files, ['resource-server-grants-light-actual.png']);
   });
 
+  it('reports a screenshot as added when its baseline on disk was written by Playwright, not pulled', () => {
+    const f = fixture();
+    // updateSnapshots: 'missing' fails the test and also writes the actual image where the
+    // baseline would be, so the file is on disk by the time the report runs.
+    writeResult(f.results, 'card-chromium', 'card.light-actual.png', 'card');
+    writeBaseline(f.baselines, 'card.light.png', 'card');
+    recordPulled(f.baselines, ['card.png']);
+
+    const { rows, files } = collect(f);
+
+    assert.deepEqual(rows, [['added', 'card.light', 'actual']]);
+    assert.deepEqual(files, ['card.light-actual.png']);
+  });
+
+  it('reports every screenshot as added when nothing was pulled', () => {
+    const f = fixture();
+    writeResult(f.results, 'card-chromium', 'card-actual.png', 'card');
+    writeBaseline(f.baselines, 'card.png', 'card');
+    recordPulled(f.baselines, []);
+
+    const { rows } = collect(f);
+
+    assert.deepEqual(rows, [['added', 'card', 'actual']]);
+  });
+
+  it('falls back to the baselines on disk when nothing records what was pulled', () => {
+    const f = fixture();
+    writeResult(f.results, 'edit-chromium', 'resource-server-edit-actual.png', 'actual');
+    writeBaseline(f.baselines, 'resource-server-edit.png', 'baseline');
+
+    const { rows } = collect(f);
+
+    assert.deepEqual(rows, [['changed', 'resource-server-edit', 'expected,actual']]);
+  });
+
   it('reports a size mismatch as changed even though no diff image was produced', () => {
     const f = fixture();
     writeResult(f.results, 'edit-chromium', 'resource-server-edit-actual.png', 'actual');
     writeBaseline(f.baselines, 'resource-server-edit.png', 'baseline');
+    recordPulled(f.baselines, ['resource-server-edit.png']);
 
     const { rows, files } = collect(f);
 
@@ -98,6 +140,7 @@ describe('diff-collect', () => {
     writeResult(f.results, 'edit-chromium', 'resource-server-edit-actual.png', 'actual');
     writeResult(f.results, 'edit-chromium', 'resource-server-edit-diff.png', 'diff');
     writeBaseline(f.baselines, 'resource-server-edit.png', 'baseline');
+    recordPulled(f.baselines, ['resource-server-edit.png']);
     writeResult(f.results, 'grants-chromium', 'resource-server-grants-dark-actual.png', 'new-dark');
     writeResult(f.results, 'grants-chromium', 'resource-server-grants-light-actual.png', 'new-light');
 

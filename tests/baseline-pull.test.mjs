@@ -79,6 +79,9 @@ function pull(cwd, args) {
 
 const OTHER = 'f'.repeat(40);
 
+const contents = dir => readdirSync(dir).sort();
+const pulledRecord = dir => readFileSync(join(dir, '.pulled'), 'utf8');
+
 describe('baseline-pull', () => {
   it('takes the generation captured at the branch point', () => {
     const { origin, work, baseSha } = repository();
@@ -88,8 +91,9 @@ describe('baseline-pull', () => {
 
     assert.equal(outputs.sha, baseSha);
     assert.equal(outputs.note, '');
-    assert.deepEqual(readdirSync(join(work, '.screenshot-baselines')), ['home.png']);
+    assert.deepEqual(contents(join(work, '.screenshot-baselines')), ['.pulled', 'home.png']);
     assert.equal(readFileSync(join(work, '.screenshot-baselines', 'home.png'), 'utf8'), `png for ${baseSha}`);
+    assert.equal(pulledRecord(join(work, '.screenshot-baselines')), 'home.png\n');
   });
 
   it('falls back to the latest generation and says so when the branch point has none', () => {
@@ -113,14 +117,15 @@ describe('baseline-pull', () => {
     assert.equal(outputs.note, '');
   });
 
-  it('leaves an empty directory and reports why when the storage branch does not exist', () => {
+  it('pulls no baselines, records that, and reports why when the storage branch does not exist', () => {
     const { work } = repository();
 
     const outputs = pull(work, ['--base-branch', 'main']);
 
     assert.equal(outputs.sha, '');
     assert.match(outputs.note, /screenshot-baselines/);
-    assert.deepEqual(readdirSync(join(work, '.screenshot-baselines')), []);
+    assert.deepEqual(contents(join(work, '.screenshot-baselines')), ['.pulled']);
+    assert.equal(pulledRecord(join(work, '.screenshot-baselines')), '');
   });
 
   it('honours a storage branch and a destination given from outside', () => {
@@ -130,7 +135,7 @@ describe('baseline-pull', () => {
     const outputs = pull(work, ['--base-branch', 'main', '--branch', 'goldens', '--dir', '.goldens']);
 
     assert.equal(outputs.sha, baseSha);
-    assert.deepEqual(readdirSync(join(work, '.goldens')), ['home.png']);
+    assert.deepEqual(contents(join(work, '.goldens')), ['.pulled', 'home.png']);
   });
 
   it('reports both missing when the storage branch has no latest pointer and the branch point has no generation', () => {
@@ -141,7 +146,8 @@ describe('baseline-pull', () => {
 
     assert.equal(outputs.sha, '');
     assert.equal(outputs.note, `neither the branch point ${baseSha.slice(0, 8)} nor latest has baselines`);
-    assert.deepEqual(readdirSync(join(work, '.screenshot-baselines')), []);
+    assert.deepEqual(contents(join(work, '.screenshot-baselines')), ['.pulled']);
+    assert.equal(pulledRecord(join(work, '.screenshot-baselines')), '');
   });
 
   it('reports no baselines found when latest points at a generation with no files', () => {
@@ -152,6 +158,7 @@ describe('baseline-pull', () => {
 
     assert.equal(outputs.sha, '');
     assert.equal(outputs.note, 'no baselines found');
-    assert.deepEqual(readdirSync(join(work, '.screenshot-baselines')), []);
+    assert.deepEqual(contents(join(work, '.screenshot-baselines')), ['.pulled']);
+    assert.equal(pulledRecord(join(work, '.screenshot-baselines')), '');
   });
 });
