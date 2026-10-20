@@ -36,7 +36,7 @@ jobs:
       # workspace, which is empty until something checks it out, and a checkout here
       # fetches the caller's repository, not this one.
       - name: Approve screenshot review
-        uses: hshn/screenshot-review/review-status@v0.2.0 # x-release-please-version
+        uses: hshn/screenshot-review/review-status@v0.2.1 # x-release-please-version
         with:
           sha: ${{ github.event.pull_request.head.sha }}
           state: success
