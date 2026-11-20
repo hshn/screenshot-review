@@ -161,6 +161,13 @@ describe('baseline-pull', () => {
     assert.equal(outputs.note, `branch point ${c1.slice(0, 8)} has no baselines, using latest ${c2.slice(0, 8)}`);
   });
 
+  it('ignores a storage directory not named by a commit SHA even when git resolves it to an ancestor', () => {
+    const { origin, work, shas: [c0] } = mainline(3, 1);
+    publish(origin, { generations: [c0, 'feature~1'], latest: c0 });
+
+    assert.equal(pull(work, ['--base-branch', 'main']).sha, c0);
+  });
+
   it('walks the ancestors of a commit asked for by --ref', () => {
     const { origin, work, shas: [c0, c1, c2] } = mainline(3, 1);
     publish(origin, { generations: [c0, c2], latest: c2 });

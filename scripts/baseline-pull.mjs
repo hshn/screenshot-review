@@ -94,14 +94,15 @@ const hasGeneration = ref => {
 };
 
 // Candidates come from the storage branch rather than from listing the commit's history:
-// they are bounded by KEEP, while the history of a large repository is not. A directory
-// name that is not a commit here fails the ancestry check and drops out.
+// they are bounded by KEEP, while the history of a large repository is not. A generation
+// whose commit is not in this repository fails the ancestry check and drops out.
+const COMMIT_SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const nearestAncestorGeneration = commit => {
   const generations = tryGit(['ls-tree', '-d', '--name-only', REMOTE_REF]);
   if (!generations.ok) return null;
   const distances = generations.out
     .split('\n')
-    .filter(gen => gen !== '' && tryGit(['merge-base', '--is-ancestor', gen, commit]).ok)
+    .filter(gen => COMMIT_SHA.test(gen) && tryGit(['merge-base', '--is-ancestor', gen, commit]).ok)
     .map(gen => ({ gen, distance: Number(git(['rev-list', '--count', `${gen}..${commit}`])) }));
   if (distances.length === 0) return null;
   return distances.reduce((nearest, candidate) => (candidate.distance < nearest.distance ? candidate : nearest)).gen;
