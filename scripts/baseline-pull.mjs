@@ -2,7 +2,8 @@
 // Fetch one generation of baseline images from the branch that stores them. By default it
 // takes the generation captured at this branch's merge-base with the base branch, so a
 // pull request compares against what it actually diverged from. When that generation is
-// gone it falls back to the latest one and says so on the way out.
+// gone it takes the generation of the nearest ancestor that has one, and only when no
+// ancestor has one falls back to the latest generation — saying so on the way out.
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -92,8 +93,30 @@ const hasGeneration = ref => {
   return found.ok && found.out !== '';
 };
 
+// Candidates come from the storage branch rather than from listing the commit's history:
+// they are bounded by KEEP, while the history of a large repository is not. A directory
+// name that is not a commit here fails the ancestry check and drops out.
+const nearestAncestorGeneration = commit => {
+  const generations = tryGit(['ls-tree', '-d', '--name-only', REMOTE_REF]);
+  if (!generations.ok) return null;
+  const distances = generations.out
+    .split('\n')
+    .filter(gen => gen !== '' && tryGit(['merge-base', '--is-ancestor', gen, commit]).ok)
+    .map(gen => ({ gen, distance: Number(git(['rev-list', '--count', `${gen}..${commit}`])) }));
+  if (distances.length === 0) return null;
+  return distances.reduce((nearest, candidate) => (candidate.distance < nearest.distance ? candidate : nearest)).gen;
+};
+
 let sha = requested !== LATEST && hasGeneration(requested) ? requested : null;
 let note = null;
+
+if (!sha && requested !== LATEST) {
+  const ancestor = nearestAncestorGeneration(requested);
+  if (ancestor) {
+    sha = ancestor;
+    note = `branch point ${requested.slice(0, 8)} has no baselines, using its nearest ancestor ${ancestor.slice(0, 8)}`;
+  }
+}
 
 if (!sha) {
   const latest = tryGit(['show', `${REMOTE_REF}:${LATEST}`]);
