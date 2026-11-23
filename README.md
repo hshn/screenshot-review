@@ -66,24 +66,24 @@ jobs:
 
       - name: Pull baseline
         id: baseline
-        uses: hshn/screenshot-review/baseline-pull@v0.2.1
+        uses: hshn/screenshot-review/baseline-pull@v0.2.2
 
       - name: Run screenshot tests
         id: screenshot
-        uses: hshn/screenshot-review/run@v0.2.1
+        uses: hshn/screenshot-review/run@v0.2.2
         with:
           command: npx playwright test
 
       - name: Report diffs
         if: failure() && steps.screenshot.outcome == 'failure'
-        uses: hshn/screenshot-review/diff-report@v0.2.1
+        uses: hshn/screenshot-review/diff-report@v0.2.2
         with:
           pr-number: ${{ github.event.pull_request.number }}
           github-token: ${{ github.token }}
 
       - name: Write status
         if: always()
-        uses: hshn/screenshot-review/review-status@v0.2.1
+        uses: hshn/screenshot-review/review-status@v0.2.2
         with:
           sha: ${{ github.event.pull_request.head.sha }}
           state: ${{ steps.screenshot.outcome == 'success' && 'success' || 'failure' }}
@@ -143,7 +143,7 @@ on:
 
 jobs:
   approval:
-    uses: hshn/screenshot-review/.github/workflows/approval.yml@v0.2.1
+    uses: hshn/screenshot-review/.github/workflows/approval.yml@v0.2.2
     permissions:
       contents: read
       statuses: write
