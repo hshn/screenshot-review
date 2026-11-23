@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/hshn/screenshot-review/compare/v0.2.1...v0.2.2) (2026-11-23)
+
+
+### Bug Fixes
+
+* compare against the nearest ancestor's baselines before latest ([#23](https://github.com/hshn/screenshot-review/issues/23)) ([407c6b1](https://github.com/hshn/screenshot-review/commit/407c6b11ea816f3671331bd7810493e644350695))
+
 ## [0.2.1](https://github.com/hshn/screenshot-review/compare/v0.2.0...v0.2.1) (2026-10-19)
 
 
