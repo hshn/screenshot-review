@@ -1,8 +1,9 @@
 name: Pull screenshot baselines
 description: |
   Fetch one generation of baseline images from the branch that stores them. By default it
-  takes the generation captured at this branch's merge-base with the base branch, falling
-  back to the latest one and reporting the fallback through the note output.
+  takes the generation captured at this branch's merge-base with the base branch. When that
+  one is gone it takes the nearest ancestor's generation, then the latest one, and reports
+  the fallback through the note output.
 
 inputs:
   branch:

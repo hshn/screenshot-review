@@ -41,6 +41,32 @@ function repository() {
   return { origin, work, baseSha };
 }
 
+// `count` commits on main, oldest first, and a clone on a feature branch with one commit on
+// top of shas[branchPointIndex] — so its merge-base with main is that commit.
+function mainline(count, branchPointIndex) {
+  const origin = tmp('origin-');
+  git(origin, ['init', '-q', '--bare', '-b', 'main', '.']);
+
+  const seed = tmp('seed-');
+  git(seed, ['init', '-q', '-b', 'main', '.']);
+  const shas = [];
+  for (let i = 0; i < count; i++) {
+    writeFileSync(join(seed, 'README.md'), `main ${i}`);
+    git(seed, ['add', '-A']);
+    git(seed, ['commit', '-q', '-m', `main ${i}`]);
+    shas.push(git(seed, ['rev-parse', 'HEAD']));
+  }
+  git(seed, ['push', '-q', origin, 'main']);
+
+  const work = tmp('work-');
+  git(work, ['clone', '-q', origin, '.']);
+  git(work, ['checkout', '-q', '-b', 'feature', shas[branchPointIndex]]);
+  writeFileSync(join(work, 'feature.txt'), 'feature');
+  git(work, ['add', '-A']);
+  git(work, ['commit', '-q', '-m', 'feature']);
+  return { origin, work, shas };
+}
+
 // The storage branch's layout: <sha>/<name>.png, plus "latest" and "manifest". Omit
 // "latest" to reproduce a storage branch that was never given a latest pointer.
 function publish(origin, { generations, latest, branch = 'screenshot-baselines' }) {
@@ -97,14 +123,56 @@ describe('baseline-pull', () => {
   });
 
   it('falls back to the latest generation and says so when the branch point has none', () => {
-    const { origin, work } = repository();
+    const { origin, work, baseSha } = repository();
     publish(origin, { generations: [OTHER], latest: OTHER });
 
     const outputs = pull(work, ['--base-branch', 'main']);
 
     assert.equal(outputs.sha, OTHER);
-    assert.match(outputs.note, /latest/);
+    assert.equal(outputs.note, `branch point ${baseSha.slice(0, 8)} has no baselines, using latest ${OTHER.slice(0, 8)}`);
     assert.equal(readFileSync(join(work, '.screenshot-baselines', 'home.png'), 'utf8'), `png for ${OTHER}`);
+  });
+
+  it("takes the nearest ancestor's generation and says so when the branch point has none", () => {
+    const { origin, work, shas: [c0, c1, c2] } = mainline(3, 1);
+    publish(origin, { generations: [c0, c2], latest: c2 });
+
+    const outputs = pull(work, ['--base-branch', 'main']);
+
+    assert.equal(outputs.sha, c0);
+    assert.equal(outputs.note, `branch point ${c1.slice(0, 8)} has no baselines, using its nearest ancestor ${c0.slice(0, 8)}`);
+    assert.equal(readFileSync(join(work, '.screenshot-baselines', 'home.png'), 'utf8'), `png for ${c0}`);
+  });
+
+  it('prefers the nearer of two ancestors with generations', () => {
+    const { origin, work, shas: [c0, c1, , c3] } = mainline(4, 2);
+    publish(origin, { generations: [c0, c1, c3], latest: c3 });
+
+    assert.equal(pull(work, ['--base-branch', 'main']).sha, c1);
+  });
+
+  it('falls back to latest when the only generation is a descendant of the branch point', () => {
+    const { origin, work, shas: [, c1, c2] } = mainline(3, 1);
+    publish(origin, { generations: [c2], latest: c2 });
+
+    const outputs = pull(work, ['--base-branch', 'main']);
+
+    assert.equal(outputs.sha, c2);
+    assert.equal(outputs.note, `branch point ${c1.slice(0, 8)} has no baselines, using latest ${c2.slice(0, 8)}`);
+  });
+
+  it('ignores a storage directory not named by a commit SHA even when git resolves it to an ancestor', () => {
+    const { origin, work, shas: [c0] } = mainline(3, 1);
+    publish(origin, { generations: [c0, 'feature~1'], latest: c0 });
+
+    assert.equal(pull(work, ['--base-branch', 'main']).sha, c0);
+  });
+
+  it('walks the ancestors of a commit asked for by --ref', () => {
+    const { origin, work, shas: [c0, c1, c2] } = mainline(3, 1);
+    publish(origin, { generations: [c0, c2], latest: c2 });
+
+    assert.equal(pull(work, ['--ref', c1]).sha, c0);
   });
 
   it('takes the latest generation without consulting the branch point when asked for it', () => {
