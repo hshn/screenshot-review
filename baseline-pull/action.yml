@@ -2,8 +2,9 @@ name: Pull screenshot baselines
 description: |
   Fetch one generation of baseline images from the branch that stores them. By default it
   takes the generation captured at this branch's merge-base with the base branch. When that
-  one is gone it takes the nearest ancestor's generation, then the latest one, and reports
-  the fallback through the note output.
+  one is missing but newer than the latest generation, it waits up to wait-timeout for the
+  base branch to publish it. When it does not appear, it takes the nearest ancestor's generation, then the
+  latest one, and reports the fallback through the note output.
 
 inputs:
   branch:
@@ -22,6 +23,15 @@ inputs:
     description: Branch the branch point is computed against. Ignored when ref is given.
     required: false
     default: ${{ github.event.repository.default_branch }}
+  wait-timeout:
+    description: |
+      Seconds to wait for the branch point's generation when it is newer than the latest
+      one, so its capture on the base branch is most likely still running. Ignored when
+      ref is given. 0 disables waiting. A base-branch commit whose capture never runs —
+      skipped by a path filter or [skip ci] — makes every pull request from it wait this
+      long, so lower it if your capture job does not run on every push.
+    required: false
+    default: '600'
 
 outputs:
   sha:
@@ -42,9 +52,10 @@ runs:
         DIR: ${{ inputs.dir }}
         REF: ${{ inputs.ref }}
         BASE_BRANCH: ${{ inputs.base-branch }}
+        WAIT_TIMEOUT: ${{ inputs.wait-timeout }}
         PULL_SCRIPT: ${{ github.action_path }}/../scripts/baseline-pull.mjs
       run: |
-        args=(--branch "$BRANCH" --dir "$DIR")
+        args=(--branch "$BRANCH" --dir "$DIR" --wait-timeout "$WAIT_TIMEOUT")
         if [ -n "$REF" ]; then
           args+=(--ref "$REF")
         else

@@ -2,7 +2,9 @@
 // Fetch one generation of baseline images from the branch that stores them. By default it
 // takes the generation captured at this branch's merge-base with the base branch, so a
 // pull request compares against what it actually diverged from. When that generation is
-// gone it takes the generation of the nearest ancestor that has one, and only when no
+// missing but newer than latest, its capture is most likely still running on the base
+// branch, so it waits for it — up to --wait-timeout seconds. Otherwise, or when the wait
+// runs out, it takes the generation of the nearest ancestor that has one, and only when no
 // ancestor has one falls back to the latest generation — saying so on the way out.
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -25,6 +27,19 @@ if (!REQUESTED_REF && !BASE_BRANCH) {
   console.error('Pass --base-branch <name> to compare against its branch point, or --ref <sha|latest>.');
   process.exit(1);
 }
+
+const seconds = (name, fallback, { allowZero }) => {
+  const raw = flag(name, fallback);
+  const value = Number(raw);
+  if (raw === '' || !Number.isFinite(value) || value < 0 || (!allowZero && value === 0)) {
+    console.error(`--${name} takes a number of seconds${allowZero ? '' : ' above zero'}, got "${raw}".`);
+    process.exit(1);
+  }
+  return value;
+};
+
+const WAIT_TIMEOUT = seconds('wait-timeout', '600', { allowZero: true });
+const WAIT_INTERVAL = seconds('wait-interval', '10', { allowZero: false });
 
 const git = args => execFileSync('git', args, { encoding: 'utf8' }).trim();
 
@@ -83,7 +98,9 @@ if (status !== 0) {
   process.exit(0);
 }
 
-if (!tryGit(['fetch', '--no-tags', 'origin', `+refs/heads/${BRANCH}:${REMOTE_REF}`]).ok) {
+const fetchStorage = () => tryGit(['fetch', '--no-tags', 'origin', `+refs/heads/${BRANCH}:${REMOTE_REF}`]).ok;
+
+if (!fetchStorage()) {
   finish(null, `could not fetch the ${BRANCH} branch`);
   process.exit(0);
 }
@@ -108,20 +125,59 @@ const nearestAncestorGeneration = commit => {
   return distances.reduce((nearest, candidate) => (candidate.distance < nearest.distance ? candidate : nearest)).gen;
 };
 
+const latestPointer = () => {
+  const latest = tryGit(['show', `${REMOTE_REF}:${LATEST}`]);
+  return latest.ok && latest.out !== '' ? latest.out : null;
+};
+
+// The base branch captures a generation after each of its commits lands, so a base-branch
+// commit newer than latest is one whose capture has most likely not finished yet. One that
+// latest already descends from, or that shares no line with it, will not get a generation
+// by waiting. Only the branch point is known to be a base-branch commit; a --ref may not be.
+const captureInProgress = commit => {
+  const latest = latestPointer();
+  return latest !== null && latest !== commit && tryGit(['merge-base', '--is-ancestor', latest, commit]).ok;
+};
+
+const sleep = s => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, s * 1000);
+
+const FOUND = 'found';
+const SUPERSEDED = 'superseded';
+const TIMED_OUT = 'timed out';
+
+const waitForGeneration = commit => {
+  console.log(`Waiting up to ${WAIT_TIMEOUT}s for the baselines of branch point ${commit.slice(0, 8)}`);
+  const deadline = Date.now() + WAIT_TIMEOUT * 1000;
+  for (let remaining = WAIT_TIMEOUT; remaining > 0; remaining = (deadline - Date.now()) / 1000) {
+    sleep(Math.min(WAIT_INTERVAL, remaining));
+    if (!fetchStorage()) continue;
+    if (hasGeneration(commit)) return FOUND;
+    if (!captureInProgress(commit)) return SUPERSEDED;
+  }
+  return TIMED_OUT;
+};
+
 let sha = requested !== LATEST && hasGeneration(requested) ? requested : null;
 let note = null;
+let missing = 'has no baselines';
+
+if (!sha && !REQUESTED_REF && WAIT_TIMEOUT > 0 && captureInProgress(requested)) {
+  const waited = waitForGeneration(requested);
+  if (waited === FOUND) sha = requested;
+  if (waited === TIMED_OUT) missing = `has no baselines after waiting ${WAIT_TIMEOUT}s`;
+}
 
 if (!sha && requested !== LATEST) {
   const ancestor = nearestAncestorGeneration(requested);
   if (ancestor) {
     sha = ancestor;
-    note = `branch point ${requested.slice(0, 8)} has no baselines, using its nearest ancestor ${ancestor.slice(0, 8)}`;
+    note = `branch point ${requested.slice(0, 8)} ${missing}, using its nearest ancestor ${ancestor.slice(0, 8)}`;
   }
 }
 
 if (!sha) {
-  const latest = tryGit(['show', `${REMOTE_REF}:${LATEST}`]);
-  if (!latest.ok || latest.out === '') {
+  const latest = latestPointer();
+  if (latest === null) {
     finish(
       null,
       requested === LATEST
@@ -130,7 +186,7 @@ if (!sha) {
     );
     process.exit(0);
   }
-  sha = latest.out;
+  sha = latest;
 
   if (!hasGeneration(sha)) {
     finish(null, 'no baselines found');
@@ -138,7 +194,7 @@ if (!sha) {
   }
 
   if (requested !== LATEST) {
-    note = `branch point ${requested.slice(0, 8)} has no baselines, using latest ${sha.slice(0, 8)}`;
+    note = `branch point ${requested.slice(0, 8)} ${missing}, using latest ${sha.slice(0, 8)}`;
   }
 }
 
