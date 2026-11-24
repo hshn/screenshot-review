@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -82,10 +82,18 @@ function publish(origin, { generations, latest, branch = 'screenshot-baselines' 
   writeFileSync(join(store, 'manifest'), `${generations.join('\n')}\n`);
   git(store, ['add', '-A']);
   git(store, ['commit', '-q', '-m', 'baselines']);
-  git(store, ['push', '-q', origin, branch]);
+  git(store, ['push', '-q', '--force', origin, branch]);
 }
 
-function pull(cwd, args) {
+const outputsIn = file =>
+  Object.fromEntries(
+    readFileSync(file, 'utf8')
+      .split('\n')
+      .filter(line => line !== '')
+      .map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])
+  );
+
+function run(cwd, args) {
   const outputFile = join(tmp('gho-'), 'out');
   writeFileSync(outputFile, '');
   const result = spawnSync('node', [script, ...args], {
@@ -94,14 +102,38 @@ function pull(cwd, args) {
     encoding: 'utf8',
     timeout: 60_000,
   });
-  assert.equal(result.status, 0, result.stderr);
-  return Object.fromEntries(
-    readFileSync(outputFile, 'utf8')
-      .split('\n')
-      .filter(line => line !== '')
-      .map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])
-  );
+  return { result, outputFile };
 }
+
+function pull(cwd, args) {
+  const { result, outputFile } = run(cwd, args);
+  assert.equal(result.status, 0, result.stderr);
+  return outputsIn(outputFile);
+}
+
+// Runs the pull in the background so the test can publish while it waits.
+function pullInBackground(cwd, args) {
+  const outputFile = join(tmp('gho-'), 'out');
+  writeFileSync(outputFile, '');
+  const startedAt = Date.now();
+  const child = spawn('node', [script, ...args], {
+    cwd,
+    env: { ...env, GITHUB_OUTPUT: outputFile },
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
+  let stderr = '';
+  child.stderr.on('data', chunk => (stderr += chunk));
+  return new Promise((resolve, reject) => {
+    child.on('error', reject);
+    child.on('close', status => {
+      if (status !== 0) reject(new Error(`exited ${status}: ${stderr}`));
+      else resolve({ outputs: outputsIn(outputFile), elapsedMs: Date.now() - startedAt });
+    });
+  });
+}
+
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+const FAST_POLL = ['--wait-interval', '0.2'];
 
 const OTHER = 'f'.repeat(40);
 
@@ -161,11 +193,73 @@ describe('baseline-pull', () => {
     assert.equal(outputs.note, `branch point ${c1.slice(0, 8)} has no baselines, using latest ${c2.slice(0, 8)}`);
   });
 
+  it("waits for the branch point's generation while latest is behind it", async () => {
+    const { origin, work, shas: [c0, c1, c2] } = mainline(3, 2);
+    publish(origin, { generations: [c0, c1], latest: c1 });
+
+    const pulling = pullInBackground(work, ['--base-branch', 'main', '--wait-timeout', '30', ...FAST_POLL]);
+    await delay(1_000);
+    publish(origin, { generations: [c0, c1, c2], latest: c2 });
+    const { outputs } = await pulling;
+
+    assert.equal(outputs.sha, c2);
+    assert.equal(outputs.note, '');
+    assert.equal(readFileSync(join(work, '.screenshot-baselines', 'home.png'), 'utf8'), `png for ${c2}`);
+  });
+
+  it('falls back with a note saying it stopped waiting when the limit runs out', () => {
+    const { origin, work, shas: [c0, c1, c2] } = mainline(3, 2);
+    publish(origin, { generations: [c0, c1], latest: c1 });
+
+    const outputs = pull(work, ['--base-branch', 'main', '--wait-timeout', '1', ...FAST_POLL]);
+
+    assert.equal(outputs.sha, c1);
+    assert.equal(
+      outputs.note,
+      `branch point ${c2.slice(0, 8)} has no baselines after waiting 1s, using its nearest ancestor ${c1.slice(0, 8)}`
+    );
+  });
+
+  it('stops waiting once latest moves past the branch point', async () => {
+    const { origin, work, shas: [c0, c1, c2, c3] } = mainline(4, 2);
+    publish(origin, { generations: [c0, c1], latest: c1 });
+
+    const pulling = pullInBackground(work, ['--base-branch', 'main', '--wait-timeout', '30', ...FAST_POLL]);
+    await delay(1_000);
+    publish(origin, { generations: [c0, c1, c3], latest: c3 });
+    const { outputs, elapsedMs } = await pulling;
+
+    assert.equal(outputs.sha, c1);
+    assert.equal(outputs.note, `branch point ${c2.slice(0, 8)} has no baselines, using its nearest ancestor ${c1.slice(0, 8)}`);
+    assert.ok(elapsedMs < 15_000, `waited ${elapsedMs}ms`);
+  });
+
+  it('does not wait when the branch point is an ancestor of latest', () => {
+    const { origin, work, shas: [, , c2] } = mainline(3, 1);
+    publish(origin, { generations: [c2], latest: c2 });
+
+    const startedAt = Date.now();
+    const outputs = pull(work, ['--base-branch', 'main', '--wait-timeout', '30', ...FAST_POLL]);
+
+    assert.equal(outputs.sha, c2);
+    assert.ok(Date.now() - startedAt < 15_000, `waited ${Date.now() - startedAt}ms`);
+  });
+
+  it('rejects a wait-timeout that is not a non-negative number', () => {
+    const { work } = repository();
+
+    for (const value of ['-1', 'soon']) {
+      const { result } = run(work, ['--base-branch', 'main', '--wait-timeout', value]);
+      assert.equal(result.status, 1, `--wait-timeout ${value}`);
+      assert.match(result.stderr, /--wait-timeout/);
+    }
+  });
+
   it('ignores a storage directory not named by a commit SHA even when git resolves it to an ancestor', () => {
     const { origin, work, shas: [c0] } = mainline(3, 1);
     publish(origin, { generations: [c0, 'feature~1'], latest: c0 });
 
-    assert.equal(pull(work, ['--base-branch', 'main']).sha, c0);
+    assert.equal(pull(work, ['--base-branch', 'main', '--wait-timeout', '0']).sha, c0);
   });
 
   it('walks the ancestors of a commit asked for by --ref', () => {
