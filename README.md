@@ -8,8 +8,11 @@ the working tree, so pull requests never serialize behind each other's baseline 
 - A push to the default branch captures a new generation of baselines onto a storage
   branch, named by the commit it was captured for.
 - A pull request pulls the generation captured at its branch point and compares against
-  it. When that generation is gone it takes the generation of the branch point's nearest
-  ancestor that has one, then falls back to the latest one, and says which it used.
+  it. When that generation is not captured yet — the branch point is newer than the latest
+  generation — it waits for the capture, 10 minutes by default (`wait-timeout`), holding
+  its runner meanwhile. When the generation is gone, or the wait runs out, it takes the
+  generation of the branch point's nearest ancestor that has one, then falls back to the
+  latest one, and says which it used.
 - A failed comparison pushes the screenshots to a side branch and writes them into the job
   summary, then writes a failing commit status.
 - A human looks at them and adds a label. That flips the status to success. The status is
