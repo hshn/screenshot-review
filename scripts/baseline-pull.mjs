@@ -130,9 +130,10 @@ const latestPointer = () => {
   return latest.ok && latest.out !== '' ? latest.out : null;
 };
 
-// Every generation is captured after its commit lands, so a commit newer than latest is
-// one whose capture has most likely not finished yet. One that latest already descends
-// from, or that shares no line with it, will not get a generation by waiting.
+// The base branch captures a generation after each of its commits lands, so a base-branch
+// commit newer than latest is one whose capture has most likely not finished yet. One that
+// latest already descends from, or that shares no line with it, will not get a generation
+// by waiting. Only the branch point is known to be a base-branch commit; a --ref may not be.
 const captureInProgress = commit => {
   const latest = latestPointer();
   return latest !== null && latest !== commit && tryGit(['merge-base', '--is-ancestor', latest, commit]).ok;
@@ -160,7 +161,7 @@ let sha = requested !== LATEST && hasGeneration(requested) ? requested : null;
 let note = null;
 let missing = 'has no baselines';
 
-if (!sha && requested !== LATEST && WAIT_TIMEOUT > 0 && captureInProgress(requested)) {
+if (!sha && !REQUESTED_REF && WAIT_TIMEOUT > 0 && captureInProgress(requested)) {
   const waited = waitForGeneration(requested);
   if (waited === FOUND) sha = requested;
   if (waited === TIMED_OUT) missing = `has no baselines after waiting ${WAIT_TIMEOUT}s`;

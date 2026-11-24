@@ -245,6 +245,17 @@ describe('baseline-pull', () => {
     assert.ok(Date.now() - startedAt < 15_000, `waited ${Date.now() - startedAt}ms`);
   });
 
+  it('does not wait for a commit asked for by --ref, which no base-branch capture may ever publish', () => {
+    const { origin, work, shas: [c0, c1, c2] } = mainline(3, 2);
+    publish(origin, { generations: [c0, c1], latest: c1 });
+
+    const startedAt = Date.now();
+    const outputs = pull(work, ['--ref', c2, '--wait-timeout', '30', ...FAST_POLL]);
+
+    assert.equal(outputs.sha, c1);
+    assert.ok(Date.now() - startedAt < 15_000, `waited ${Date.now() - startedAt}ms`);
+  });
+
   it('rejects a wait-timeout that is not a non-negative number', () => {
     const { work } = repository();
 
